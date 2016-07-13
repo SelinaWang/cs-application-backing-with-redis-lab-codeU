@@ -60,6 +60,13 @@ public class JedisIndex {
 		return jedis.exists(redisKey);
 	}
 	
+	 /**
+     * Adds a URL to the set associated with `term`.
+     */
+    public void add(String term, TermCounter tc) {
+    	jedis.sadd(urlSetKey(term),tc.getLabel());
+    }
+
 	/**
 	 * Looks up a search term and returns a set of URLs.
 	 * 
@@ -67,8 +74,8 @@ public class JedisIndex {
 	 * @return Set of URLs.
 	 */
 	public Set<String> getURLs(String term) {
-        // FILL THIS IN!
-		return null;
+        Set<String> set = jedis.smembers(urlSetKey(term));
+        return set;
 	}
 
     /**
@@ -78,8 +85,13 @@ public class JedisIndex {
 	 * @return Map from URL to count.
 	 */
 	public Map<String, Integer> getCounts(String term) {
-        // FILL THIS IN!
-		return null;
+        Map<String, Integer> map = new HashMap<String, Integer>();
+        Set<String> urlSet = getURLs(term);
+        for (String url: urlSet) {
+        	Integer count = getCount(url, term);
+        	map.put(url, count);
+        }
+		return map;
 	}
 
     /**
@@ -90,8 +102,9 @@ public class JedisIndex {
 	 * @return
 	 */
 	public Integer getCount(String url, String term) {
-        // FILL THIS IN!
-		return null;
+        String count = jedis.hget(termCounterKey(url), term);
+        Integer countInt = new Integer(count);
+		return countInt;
 	}
 
 
@@ -102,7 +115,16 @@ public class JedisIndex {
 	 * @param paragraphs  Collection of elements that should be indexed.
 	 */
 	public void indexPage(String url, Elements paragraphs) {
-        // FILL THIS IN!
+        TermCounter tc = new TermCounter(url);
+        tc.processElements(paragraphs);
+        Transaction t = jedis.multi();
+        t.del(termCounterKey(url));
+        for (String key: tc.keySet()) {
+        	Integer count = tc.get(key);
+        	t.hset(termCounterKey(url), key, count.toString());
+        	t.sadd(urlSetKey(key), url);
+        }
+        t.exec();
 	}
 
 	/**
